@@ -68,10 +68,10 @@ The Laravel framework is open-sourced software licensed under the [MIT license](
 ## Deploy on Railway
 
 1. Railwayでこのリポジトリを選択して新規プロジェクトを作成します。
-2. `railway.json` により、デプロイ時に以下が実行されます。
+2. `railway.json` により、ビルド時に以下が実行されます（`config:cache` はビルドでは行わず、起動時に実行して本番の環境変数を反映します）。
    - `composer install --no-dev --optimize-autoloader --no-interaction`
    - `npm ci && npm run build`
-   - `php artisan config:cache && php artisan route:cache && php artisan view:cache`
-3. 起動は `Procfile` / `railway.json` の `web` コマンドで `PORT` を使って実行されます。
+   - `php artisan route:cache && php artisan view:cache`
+3. 起動時に `php artisan config:cache` のあと `php artisan serve` で `PORT` を使って実行されます。
 4. 環境変数は `.env.railway.example` をベースにRailway側へ設定してください（`APP_KEY` は必須）。
 5. 初回デプロイ後に必要なら Railway の Shell で `php artisan migrate --force` を実行してください。
