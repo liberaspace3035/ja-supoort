@@ -123,6 +123,7 @@
     const maxTotalSizeBytes = 100 * 1024 * 1024;
     const normalizedMaxEdge = 2000;
     const normalizedQuality = 0.82;
+    const transportSafePhotoBytes = 1900 * 1024;
 
     function enableSubmitWithLocation(lat, lng) {
         const latValue = Number(lat).toFixed(8);
@@ -193,19 +194,36 @@
 
     async function normalizeSinglePhoto(file) {
         const image = await loadImageFromFile(file);
-        const scale = Math.min(1, normalizedMaxEdge / Math.max(image.width, image.height));
-        const width = Math.max(1, Math.round(image.width * scale));
-        const height = Math.max(1, Math.round(image.height * scale));
+        let edge = normalizedMaxEdge;
+        let quality = normalizedQuality;
+        let blob = null;
 
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const context = canvas.getContext('2d');
-        context.drawImage(image, 0, 0, width, height);
+        for (let i = 0; i < 8; i += 1) {
+            const scale = Math.min(1, edge / Math.max(image.width, image.height));
+            const width = Math.max(1, Math.round(image.width * scale));
+            const height = Math.max(1, Math.round(image.height * scale));
 
-        const blob = await new Promise((resolve) => {
-            canvas.toBlob(resolve, 'image/jpeg', normalizedQuality);
-        });
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const context = canvas.getContext('2d');
+            context.drawImage(image, 0, 0, width, height);
+
+            blob = await new Promise((resolve) => {
+                canvas.toBlob(resolve, 'image/jpeg', quality);
+            });
+
+            if (!blob) {
+                break;
+            }
+
+            if (blob.size <= transportSafePhotoBytes) {
+                break;
+            }
+
+            quality = Math.max(0.45, quality - 0.07);
+            edge = Math.max(960, Math.round(edge * 0.85));
+        }
 
         if (!blob) {
             throw new Error('画像の圧縮に失敗しました。');
@@ -285,7 +303,7 @@
             normalized.forEach((file) => transfer.items.add(file));
             photoInput.files = transfer.files;
 
-            photoError.textContent = `画像を最適化しました（合計 ${formatBytes(totalSize)}）。`;
+            photoError.textContent = `画像を最適化しました（合計 ${formatBytes(totalSize)} / 1枚あたり約1.9MB以下に調整）。`;
             renderPreview(photoInput.files);
         } catch (error) {
             photoInput.value = '';
