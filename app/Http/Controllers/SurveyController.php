@@ -28,13 +28,23 @@ class SurveyController extends Controller
         $surveyDateDir = Carbon::parse($request->validated('survey_date'))->format('Y-m-d');
         $photoPaths = [];
 
-        foreach ($request->file('photos', []) as $photo) {
-            $image = $manager->read($photo->getRealPath())->scaleDown(width: 1200, height: 1200);
-            $encoded = $image->toJpeg(70);
+        try {
+            foreach ($request->file('photos', []) as $photo) {
+                $image = $manager->read($photo->getRealPath())->scaleDown(width: 1200, height: 1200);
+                $encoded = $image->toJpeg(70);
 
-            $relativePath = sprintf('photos/%s/%s.jpg', $surveyDateDir, Str::uuid()->toString());
-            Storage::disk('local')->put($relativePath, (string) $encoded);
-            $photoPaths[] = $relativePath;
+                $relativePath = sprintf('photos/%s/%s.jpg', $surveyDateDir, Str::uuid()->toString());
+                Storage::disk('local')->put($relativePath, (string) $encoded);
+                $photoPaths[] = $relativePath;
+            }
+        } catch (\Throwable $e) {
+            report($e);
+
+            return back()
+                ->withInput()
+                ->withErrors([
+                    'photos' => '画像の処理に失敗しました。JPEG / PNG / WebP 形式で、10MB以下の写真をお試しください。',
+                ]);
         }
 
         Survey::query()->create([

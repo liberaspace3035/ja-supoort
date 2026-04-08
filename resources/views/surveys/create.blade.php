@@ -86,7 +86,8 @@
 
                 <div class="mt-4">
                     <label for="photos" class="block text-sm font-medium text-gray-700">調査写真 (最大10枚)</label>
-                    <input id="photos" type="file" name="photos[]" accept=".jpg,.jpeg,.png,image/jpeg,image/png" multiple required class="mt-1 block w-full text-sm text-gray-800">
+                    <input id="photos" type="file" name="photos[]" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" multiple required class="mt-1 block w-full text-sm text-gray-800">
+                    <p class="mt-1 text-xs text-gray-500">対応形式: JPEG / PNG / WebP（1枚10MBまで、HEICは非対応）</p>
                     <div id="photo-preview" class="mt-4 grid grid-cols-2 md:grid-cols-5 gap-3"></div>
                 </div>
             </div>

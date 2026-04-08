@@ -22,7 +22,17 @@ class SurveyRequest extends FormRequest
             'latitude' => ['required', 'numeric', 'between:-90,90'],
             'longitude' => ['required', 'numeric', 'between:-180,180'],
             'photos' => ['required', 'array', 'min:1', 'max:10'],
-            'photos.*' => ['required', 'file', 'mimes:jpeg,jpg,png', 'max:5120'],
+            'photos.*' => ['required', 'image', 'mimes:jpeg,jpg,png,webp', 'max:10240'],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'photos.max' => '写真は最大10枚まで選択できます。',
+            'photos.*.image' => '写真ファイルのみアップロードできます。',
+            'photos.*.mimes' => '写真は JPEG / PNG / WebP 形式のみ対応しています（HEICは非対応）。',
+            'photos.*.max' => '写真1枚あたり10MB以下にしてください。',
         ];
     }
 }
