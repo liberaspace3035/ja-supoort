@@ -1,1 +1,1 @@
-web: php artisan migrate --force && php artisan config:cache && php artisan serve --host=0.0.0.0 --port=${PORT:-8080}
+web: php -d upload_max_filesize=20M -d post_max_size=25M -d memory_limit=512M artisan migrate --force && php -d upload_max_filesize=20M -d post_max_size=25M -d memory_limit=512M artisan config:cache && php -d upload_max_filesize=20M -d post_max_size=25M -d memory_limit=512M artisan serve --host=0.0.0.0 --port=${PORT:-8080}

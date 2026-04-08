@@ -72,6 +72,6 @@ The Laravel framework is open-sourced software licensed under the [MIT license](
    - `composer install --no-dev --optimize-autoloader --no-interaction`
    - `npm ci && npm run build`
    - `php artisan route:cache && php artisan view:cache`
-3. 起動時に `php artisan migrate --force` を実行してから `php artisan config:cache` と `php artisan serve` を実行し、`PORT` を使って起動されます。
+3. 起動時に `php artisan migrate --force` を実行してから `php artisan config:cache` と `php artisan serve` を実行し、`PORT` を使って起動されます（`upload_max_filesize=20M`, `post_max_size=25M`, `memory_limit=512M` を指定）。
 4. 環境変数は `.env.railway.example` をベースにRailway側へ設定してください（`APP_KEY` は必須）。
 5. 初回デプロイ後に必要なら Railway の Shell で `php artisan migrate --force` を実行してください。
