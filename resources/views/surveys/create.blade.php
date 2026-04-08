@@ -88,6 +88,7 @@
                     <label for="photos" class="block text-sm font-medium text-gray-700">調査写真 (最大10枚)</label>
                     <input id="photos" type="file" name="photos[]" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" multiple required class="mt-1 block w-full text-sm text-gray-800">
                     <p class="mt-1 text-xs text-gray-500">対応形式: JPEG / PNG / WebP（1枚10MBまで、HEICは非対応）</p>
+                    <p id="photo-error" class="mt-1 text-xs text-red-600"></p>
                     <div id="photo-preview" class="mt-4 grid grid-cols-2 md:grid-cols-5 gap-3"></div>
                 </div>
             </div>
@@ -115,7 +116,11 @@
     const latitudeDisplay = document.getElementById('latitude_display');
     const longitudeDisplay = document.getElementById('longitude_display');
     const photoInput = document.getElementById('photos');
+    const photoError = document.getElementById('photo-error');
     const previewArea = document.getElementById('photo-preview');
+    const supportedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    const maxPhotoSizeBytes = 10 * 1024 * 1024;
+    const maxTotalSizeBytes = 100 * 1024 * 1024;
 
     function enableSubmitWithLocation(lat, lng) {
         const latValue = Number(lat).toFixed(8);
@@ -160,8 +165,43 @@
         });
     }
 
+    function validatePhotos(files) {
+        const picked = [...files];
+        const unsupported = picked.find((file) => !supportedTypes.includes(file.type));
+        const tooLarge = picked.find((file) => file.size > maxPhotoSizeBytes);
+        const totalSize = picked.reduce((sum, file) => sum + file.size, 0);
+
+        if (unsupported) {
+            photoInput.value = '';
+            previewArea.innerHTML = '';
+            photoError.textContent = 'HEICは非対応です。iPhoneは「互換性優先（JPEG）」で撮影してください。';
+            return false;
+        }
+
+        if (tooLarge) {
+            photoInput.value = '';
+            previewArea.innerHTML = '';
+            photoError.textContent = '1枚10MB以下の写真を選択してください。';
+            return false;
+        }
+
+        if (totalSize > maxTotalSizeBytes) {
+            photoInput.value = '';
+            previewArea.innerHTML = '';
+            photoError.textContent = '合計サイズが大きすぎます。枚数を減らして再度お試しください。';
+            return false;
+        }
+
+        photoError.textContent = '';
+        return true;
+    }
+
     window.addEventListener('load', fetchLocation);
-    photoInput.addEventListener('change', (event) => renderPreview(event.target.files));
+    photoInput.addEventListener('change', (event) => {
+        if (validatePhotos(event.target.files)) {
+            renderPreview(event.target.files);
+        }
+    });
 </script>
 </body>
 </html>
