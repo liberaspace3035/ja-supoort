@@ -121,6 +121,8 @@
     const supportedTypes = ['image/jpeg', 'image/png', 'image/webp'];
     const maxPhotoSizeBytes = 10 * 1024 * 1024;
     const maxTotalSizeBytes = 100 * 1024 * 1024;
+    const normalizedMaxEdge = 2000;
+    const normalizedQuality = 0.82;
 
     function enableSubmitWithLocation(lat, lng) {
         const latValue = Number(lat).toFixed(8);
@@ -165,6 +167,70 @@
         });
     }
 
+    function formatBytes(bytes) {
+        if (!bytes || bytes <= 0) return '0 B';
+        const units = ['B', 'KB', 'MB', 'GB'];
+        const power = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+        const value = bytes / (1024 ** power);
+        return `${value.toFixed(2)} ${units[power]}`;
+    }
+
+    function loadImageFromFile(file) {
+        return new Promise((resolve, reject) => {
+            const url = URL.createObjectURL(file);
+            const image = new Image();
+            image.onload = () => {
+                URL.revokeObjectURL(url);
+                resolve(image);
+            };
+            image.onerror = () => {
+                URL.revokeObjectURL(url);
+                reject(new Error('画像の読み込みに失敗しました。'));
+            };
+            image.src = url;
+        });
+    }
+
+    async function normalizeSinglePhoto(file) {
+        const image = await loadImageFromFile(file);
+        const scale = Math.min(1, normalizedMaxEdge / Math.max(image.width, image.height));
+        const width = Math.max(1, Math.round(image.width * scale));
+        const height = Math.max(1, Math.round(image.height * scale));
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const context = canvas.getContext('2d');
+        context.drawImage(image, 0, 0, width, height);
+
+        const blob = await new Promise((resolve) => {
+            canvas.toBlob(resolve, 'image/jpeg', normalizedQuality);
+        });
+
+        if (!blob) {
+            throw new Error('画像の圧縮に失敗しました。');
+        }
+
+        const baseName = file.name.replace(/\.[^.]+$/, '');
+        return new File([blob], `${baseName}.jpg`, {
+            type: 'image/jpeg',
+            lastModified: Date.now(),
+        });
+    }
+
+    async function normalizePhotos(files) {
+        const normalized = [];
+        for (const file of files) {
+            if (file.size <= maxPhotoSizeBytes && file.type === 'image/jpeg') {
+                normalized.push(file);
+                continue;
+            }
+
+            normalized.push(await normalizeSinglePhoto(file));
+        }
+        return normalized;
+    }
+
     function validatePhotos(files) {
         const picked = [...files];
         const unsupported = picked.find((file) => !supportedTypes.includes(file.type));
@@ -197,9 +263,34 @@
     }
 
     window.addEventListener('load', fetchLocation);
-    photoInput.addEventListener('change', (event) => {
-        if (validatePhotos(event.target.files)) {
-            renderPreview(event.target.files);
+    photoInput.addEventListener('change', async (event) => {
+        const selected = [...event.target.files];
+        if (!validatePhotos(selected)) {
+            return;
+        }
+
+        try {
+            photoError.textContent = '画像を最適化中です...';
+            const normalized = await normalizePhotos(selected);
+            const totalSize = normalized.reduce((sum, file) => sum + file.size, 0);
+
+            if (totalSize > maxTotalSizeBytes) {
+                photoInput.value = '';
+                previewArea.innerHTML = '';
+                photoError.textContent = `圧縮後も合計サイズが大きすぎます（${formatBytes(totalSize)}）。枚数を減らしてください。`;
+                return;
+            }
+
+            const transfer = new DataTransfer();
+            normalized.forEach((file) => transfer.items.add(file));
+            photoInput.files = transfer.files;
+
+            photoError.textContent = `画像を最適化しました（合計 ${formatBytes(totalSize)}）。`;
+            renderPreview(photoInput.files);
+        } catch (error) {
+            photoInput.value = '';
+            previewArea.innerHTML = '';
+            photoError.textContent = '画像の最適化に失敗しました。写真を減らすか、JPEGで再選択してください。';
         }
     });
 </script>
