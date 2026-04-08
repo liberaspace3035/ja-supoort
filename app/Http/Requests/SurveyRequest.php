@@ -51,14 +51,18 @@ class SurveyRequest extends FormRequest
                 $originalName = $photo->getClientOriginalName() ?: '名称不明';
                 $size = $photo->getSize();
                 $sizeLabel = $size !== false && $size !== null ? $this->formatBytes((int) $size) : '不明';
+                $errorCode = $photo->getError();
+                $errorDetail = $this->uploadErrorDetail($errorCode);
 
                 $validator->errors()->add(
                     "photos.{$index}",
                     sprintf(
-                        '写真%d枚目（%s / %s）のアップロードに失敗しました。通信状況、画像サイズ、画像形式（HEIC不可）をご確認ください。',
+                        '写真%d枚目（%s / %s）のアップロードに失敗しました。原因: %s（コード: %d）。',
                         $index + 1,
                         $originalName,
-                        $sizeLabel
+                        $sizeLabel,
+                        $errorDetail,
+                        $errorCode
                     )
                 );
             }
@@ -77,5 +81,19 @@ class SurveyRequest extends FormRequest
         $value = $bytes / (1024 ** $power);
 
         return sprintf('%.2f %s', $value, $units[$power]);
+    }
+
+    private function uploadErrorDetail(int $errorCode): string
+    {
+        return match ($errorCode) {
+            UPLOAD_ERR_INI_SIZE => 'サーバーの upload_max_filesize を超えています',
+            UPLOAD_ERR_FORM_SIZE => 'フォームで許可されたファイルサイズを超えています',
+            UPLOAD_ERR_PARTIAL => 'ファイルが途中までしかアップロードされていません（通信不安定の可能性）',
+            UPLOAD_ERR_NO_FILE => 'ファイルが送信されませんでした',
+            UPLOAD_ERR_NO_TMP_DIR => '一時保存先フォルダがありません',
+            UPLOAD_ERR_CANT_WRITE => 'ディスクへの書き込みに失敗しました',
+            UPLOAD_ERR_EXTENSION => 'PHP拡張モジュールによりアップロードが停止されました',
+            default => '不明なアップロードエラーです',
+        };
     }
 }
