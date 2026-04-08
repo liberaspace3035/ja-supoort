@@ -109,6 +109,7 @@
 </main>
 
 <script>
+    const form = document.querySelector('form[action="{{ route('surveys.store') }}"]');
     const submitButton = document.getElementById('submit-button');
     const geoStatus = document.getElementById('geo-status');
     const latitudeInput = document.getElementById('latitude');
@@ -123,7 +124,13 @@
     const maxTotalSizeBytes = 100 * 1024 * 1024;
     const normalizedMaxEdge = 2000;
     const normalizedQuality = 0.82;
-    const transportSafePhotoBytes = 1900 * 1024;
+    const strictPerPhotoLimitBytes = 2 * 1024 * 1024;
+    let hasLocation = false;
+    let isCompressing = false;
+
+    function refreshSubmitState() {
+        submitButton.disabled = !hasLocation || isCompressing;
+    }
 
     function enableSubmitWithLocation(lat, lng) {
         const latValue = Number(lat).toFixed(8);
@@ -132,7 +139,8 @@
         longitudeInput.value = lngValue;
         latitudeDisplay.value = latValue;
         longitudeDisplay.value = lngValue;
-        submitButton.disabled = false;
+        hasLocation = true;
+        refreshSubmitState();
         geoStatus.textContent = `GPS取得完了: ${Number(lat).toFixed(6)}, ${Number(lng).toFixed(6)}`;
     }
 
@@ -198,7 +206,7 @@
         let quality = normalizedQuality;
         let blob = null;
 
-        for (let i = 0; i < 8; i += 1) {
+        for (let i = 0; i < 18; i += 1) {
             const scale = Math.min(1, edge / Math.max(image.width, image.height));
             const width = Math.max(1, Math.round(image.width * scale));
             const height = Math.max(1, Math.round(image.height * scale));
@@ -217,16 +225,20 @@
                 break;
             }
 
-            if (blob.size <= transportSafePhotoBytes) {
+            if (blob.size < strictPerPhotoLimitBytes) {
                 break;
             }
 
-            quality = Math.max(0.45, quality - 0.07);
-            edge = Math.max(960, Math.round(edge * 0.85));
+            quality = Math.max(0.20, quality - 0.06);
+            edge = Math.max(480, Math.round(edge * 0.80));
         }
 
         if (!blob) {
             throw new Error('画像の圧縮に失敗しました。');
+        }
+
+        if (blob.size >= strictPerPhotoLimitBytes) {
+            throw new Error(`圧縮後も2MB未満にできませんでした（${formatBytes(blob.size)}）。別の写真でお試しください。`);
         }
 
         const baseName = file.name.replace(/\.[^.]+$/, '');
@@ -239,11 +251,6 @@
     async function normalizePhotos(files) {
         const normalized = [];
         for (const file of files) {
-            if (file.size <= maxPhotoSizeBytes && file.type === 'image/jpeg') {
-                normalized.push(file);
-                continue;
-            }
-
             normalized.push(await normalizeSinglePhoto(file));
         }
         return normalized;
@@ -288,8 +295,18 @@
         }
 
         try {
+            isCompressing = true;
+            refreshSubmitState();
             photoError.textContent = '画像を最適化中です...';
             const normalized = await normalizePhotos(selected);
+            const oversized = normalized.find((file) => file.size >= strictPerPhotoLimitBytes);
+            if (oversized) {
+                photoInput.value = '';
+                previewArea.innerHTML = '';
+                photoError.textContent = `2MB未満に調整できない写真があります（${oversized.name} / ${formatBytes(oversized.size)}）。`;
+                return;
+            }
+
             const totalSize = normalized.reduce((sum, file) => sum + file.size, 0);
 
             if (totalSize > maxTotalSizeBytes) {
@@ -303,12 +320,24 @@
             normalized.forEach((file) => transfer.items.add(file));
             photoInput.files = transfer.files;
 
-            photoError.textContent = `画像を最適化しました（合計 ${formatBytes(totalSize)} / 1枚あたり約1.9MB以下に調整）。`;
+            photoError.textContent = `画像を最適化しました（合計 ${formatBytes(totalSize)} / 1枚あたり2MB未満を保証）。`;
             renderPreview(photoInput.files);
         } catch (error) {
             photoInput.value = '';
             previewArea.innerHTML = '';
-            photoError.textContent = '画像の最適化に失敗しました。写真を減らすか、JPEGで再選択してください。';
+            photoError.textContent = error instanceof Error
+                ? error.message
+                : '画像の最適化に失敗しました。写真を減らすか、JPEGで再選択してください。';
+        } finally {
+            isCompressing = false;
+            refreshSubmitState();
+        }
+    });
+
+    form?.addEventListener('submit', (event) => {
+        if (isCompressing) {
+            event.preventDefault();
+            photoError.textContent = '画像の最適化が完了するまでお待ちください。';
         }
     });
 </script>
